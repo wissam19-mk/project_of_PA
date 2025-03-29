@@ -1,0 +1,32 @@
+linters:
+  disable-all: true
+  fast: false
+  enable:
+    - gocritic
+    - errcheck
+    - unused
+    - unparam
+    - revive
+    - gosec
+    - govet
+    - gocyclo
+    - goconst
+    - gosimple
+    - typecheck
+    - staticcheck
+
+output:
+  # colored-line-number|line-number|json|tab|checkstyle|code-climate, default is "colored-line-number"
+  formats:
+    - format: colored-line-number
+
+  # print lines of code with issue, default is true
+  print-issued-lines: true
+
+  # print linter name in the end of issue text, default is true
+  print-linter-name: true
+
+run:
+  timeout: 600s
+  allow-parallel-runners: true
+  concurrency: 2

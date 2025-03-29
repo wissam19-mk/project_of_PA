@@ -1,0 +1,145 @@
+image: golang:1.24
+
+variables:
+  APP_NAME: "checker"
+
+stages:
+  - format
+  - lint
+  - build
+  - release
+
+format:
+  timeout: 5min
+  stage: format
+  script:
+    - make fmt
+
+lint:
+  timeout: 7min
+  stage: lint
+  script:
+    - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.5
+    - go install honnef.co/go/tools/cmd/staticcheck@latest
+    - make vet
+    - make lint
+
+.go-build:
+  before_script:
+    - go mod download
+  cache:
+    paths:
+      - vendor/
+
+build:linux:amd64:
+  extends: .go-build
+  stage: build
+  rules:
+    # Runs only on tagged commits e.g: git tag <tag name>; git push origin tag <tag name>
+    - if: $CI_COMMIT_TAG
+  script:
+    - make deploy OS=linux ARCH=amd64 BIN_NAME=${APP_NAME}-linux-amd64
+  artifacts:
+    paths:
+      - ${APP_NAME}-linux-amd64
+
+build:darwin:amd64:
+  extends: .go-build
+  stage: build
+  rules:
+    # Runs only on tagged commits e.g: git tag <tag name>; git push origin tag <tag name>
+    - if: $CI_COMMIT_TAG
+  script:
+    - make deploy OS=darwin ARCH=amd64 BIN_NAME=${APP_NAME}-darwin-amd64
+  artifacts:
+    paths:
+      - ${APP_NAME}-darwin-amd64
+
+build:windows:amd64:
+  extends: .go-build
+  stage: build
+  rules:
+    # Runs only on tagged commits e.g: git tag <tag name>; git push origin tag <tag name>
+    - if: $CI_COMMIT_TAG
+  script:
+    - make deploy OS=windows ARCH=amd64 BIN_NAME=${APP_NAME}-windows-amd64.exe
+  artifacts:
+    paths:
+      - ${APP_NAME}-windows-amd64.exe
+
+build:linux:arm64:
+  extends: .go-build
+  stage: build
+  rules:
+    # Runs only on tagged commits e.g: git tag <tag name>; git push origin tag <tag name>
+    - if: $CI_COMMIT_TAG
+  script:
+    - make deploy OS=linux ARCH=arm64 BIN_NAME=${APP_NAME}-linux-arm64
+  artifacts:
+    paths:
+      - ${APP_NAME}-linux-arm64
+
+
+build:windows:arm64:
+  extends: .go-build
+  stage: build
+  rules:
+    # Runs only on tagged commits e.g: git tag <tag name>; git push origin tag <tag name>
+    - if: $CI_COMMIT_TAG
+  script:
+    - make deploy OS=windows ARCH=arm64 BIN_NAME=${APP_NAME}-windows-arm64.exe
+  artifacts:
+    paths:
+      - ${APP_NAME}-windows-arm64.exe
+
+build:darwin:arm64:
+  extends: .go-build
+  stage: build
+  rules:
+    # Runs only on tagged commits e.g: git tag <tag name>; git push origin tag <tag name>
+    - if: $CI_COMMIT_TAG
+  script:
+    - make deploy OS=darwin ARCH=arm64 BIN_NAME=${APP_NAME}-darwin-arm64
+  artifacts:
+    paths:
+      - ${APP_NAME}-darwin-arm64
+
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - build:linux:amd64
+    - build:darwin:amd64
+    - build:windows:amd64
+    - build:linux:arm64
+    - build:windows:arm64
+    - build:darwin:arm64
+  rules:
+    # Runs only on tagged commits e.g: git tag <tag name>; git push origin tag <tag name>
+    - if: $CI_COMMIT_TAG
+  script:
+    - echo "Creating release for $CI_COMMIT_TAG"
+  release:
+    tag_name: $CI_COMMIT_TAG
+    description: "Release $CI_COMMIT_TAG"
+    assets:
+      links:
+        - name: "Linux AMD64 Binary"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/${APP_NAME}-linux-amd64?job=build:linux:amd64"
+          link_type: "package"
+        - name: "Linux ARM Binary"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/${APP_NAME}-linux-arm64?job=build:linux:arm64"
+          link_type: "package"
+        - name: "Windows AMD64 Binary"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/${APP_NAME}-windows-amd64.exe?job=build:windows:amd64"
+          link_type: "package"
+        - name: "Windows ARM Binary"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/${APP_NAME}-windows-arm64.exe?job=build:windows:arm64"
+          link_type: "package"
+        - name: "macOS AMD64 Binary"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/${APP_NAME}-darwin-amd64?job=build:darwin:amd64"
+          link_type: "package"
+        - name: "macOS ARM Binary"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/${APP_NAME}-darwin-arm64?job=build:darwin:arm64"
+          link_type: "package"
+
